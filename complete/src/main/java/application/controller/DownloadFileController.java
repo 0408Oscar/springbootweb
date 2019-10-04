@@ -12,6 +12,6 @@ public class DownloadFileController {
 	@RequestMapping(value = "/downloadpage")
     public String download(@RequestParam(name="downloadpage", required=false, defaultValue="default downloadpage") String name, Model model) {
         model.addAttribute("downloadpage", name);
-        return "downloadpage";
+        return "/content/downloadpage";
     }
 }

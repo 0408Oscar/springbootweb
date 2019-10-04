@@ -11,6 +11,6 @@ public class SayHiController {
 	@GetMapping("/sayhi")
     public String SayHi(@RequestParam(name="action", required=false, defaultValue="default Say hi") String name, Model model) {
         model.addAttribute("action", name);
-        return "sayHi";
+        return "/content/sayHi";
     }
 }
