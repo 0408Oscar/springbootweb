@@ -31,6 +31,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 @Controller
 public class DownloadFileController {
 
+	private static final String tempFolder = "temp";
+	private static final String sep = File.separator;
 	private static final SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMddHHmmss");
 	private static String fileName = "excel_" + sdf.format(new Date()) + ".xlsx";
 	private static String zipName = "zip_" + sdf.format(new Date()) + ".zip";
@@ -67,37 +69,34 @@ public class DownloadFileController {
 			for (int cellnum = 0; cellnum < 5; cellnum++) {
 
 				Cell cell = row.createCell(cellnum);
-				String address = new CellReference(cell).formatAsString();
 
-				if (rownum == 0) {
-					SetCellStyle(wb, row, cell);
-					cell.setCellValue(header[cellnum]);
-				}
-
-				else
+				if (rownum == 0) 
+					SetCellStyleAndValue(wb, row, cell, header[cellnum]);
+				else 
 					cell.setCellValue(sdf.format(new Date()));
 
 			}
 		}
 
-		FileOutputStream out = new FileOutputStream(fileName);
+		FileOutputStream out = new FileOutputStream(tempFolder + sep + fileName);
 		wb.write(out);
 		out.close();
 		// dispose of temporary files backing this workbook on disk
 		wb.dispose();
 
-		Path file = Paths.get(System.getProperty("user.dir") + File.separator + fileName);
+		Path file = Paths.get(System.getProperty("user.dir") + sep + tempFolder + sep + fileName);
 		Path zipFilePath = ZipSourceFile(file);
 
 		// return to download
 		return zipFilePath;
 	}
 
-	private void SetCellStyle(SXSSFWorkbook wb, Row row, Cell cell) {
+	private void SetCellStyleAndValue(SXSSFWorkbook wb, Row row, Cell cell, String value) {
 		CellStyle style = wb.createCellStyle();
 		style.setFillForegroundColor(IndexedColors.GREY_25_PERCENT.getIndex());
 		style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
 		cell.setCellStyle(style);
+		cell.setCellValue(value);
 	}
 
 	private Path ZipSourceFile(Path file) throws Exception {
@@ -105,7 +104,7 @@ public class DownloadFileController {
 		// Create the zip file if it doesn't exist
 		env.put("create", "true");
 
-		URI uri = URI.create("jar:" + file.getParent().toUri() + "/" + zipName);
+		URI uri = URI.create("jar:" + file.getParent().toUri() + zipName);
 		Path zipFilePath;
 		try (FileSystem zipfs = FileSystems.newFileSystem(uri, env)) {
 			Path sourcefile = file;
