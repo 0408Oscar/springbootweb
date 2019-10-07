@@ -1,8 +1,14 @@
 package application.controller;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.OutputStream;
 import java.net.URI;
+import java.net.URL;
+import java.nio.channels.Channels;
+import java.nio.channels.FileChannel;
+import java.nio.channels.ReadableByteChannel;
 import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
@@ -20,13 +26,18 @@ import org.apache.poi.ss.usermodel.FillPatternType;
 import org.apache.poi.ss.usermodel.IndexedColors;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
-import org.apache.poi.ss.util.CellReference;
 import org.apache.poi.xssf.streaming.SXSSFWorkbook;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
 
 @Controller
 public class DownloadFileController {
@@ -34,8 +45,6 @@ public class DownloadFileController {
 	private static final String tempFolder = "temp";
 	private static final String sep = File.separator;
 	private static final SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMddHHmmss");
-	private static String fileName = "excel_" + sdf.format(new Date()) + ".xlsx";
-	private static String zipName = "zip_" + sdf.format(new Date()) + ".zip";
 
 	@RequestMapping(value = "/downloadpage")
 	public String download(
@@ -45,20 +54,69 @@ public class DownloadFileController {
 		return "/content/downloadpage";
 	}
 
-	@RequestMapping(value = "/downloadExcel", method = RequestMethod.GET)
-	public String downloadExcel(HttpServletResponse resp) throws Exception {
+	@RequestMapping(value = "/downloadExcel1", method = RequestMethod.GET)
+	public ResponseEntity<Resource> downloadExcel1(HttpServletResponse resp) throws Exception {
+
+		Path zipFile = GenerateExcel();
+		ByteArrayResource resource = new ByteArrayResource(Files.readAllBytes(zipFile));
+		
+		HttpHeaders headers = new HttpHeaders();
+		headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + zipFile.getFileName());
+		headers.add("Cache-Control", "no-cache, no-store, must-revalidate");
+		headers.add("Expires", "0");
+
+		
+		//System.out.println(Files.deleteIfExists(zipFile));
+		
+		return ResponseEntity.ok().headers(headers).contentLength(zipFile.toFile().length())
+				.contentType(MediaType.parseMediaType("application/octet-stream")).body(resource);
+	}
+	
+	@RequestMapping(value = "/downloadExcel2", method = RequestMethod.GET)
+	@ResponseBody 
+	public void downloadExcel2(HttpServletResponse response) throws Exception {
 
 		Path zipFile = GenerateExcel();
 
-		resp.setContentType(null);
+		response.setContentType("application/zip");
+	    response.setHeader("Content-disposition", "attachment; filename=" + zipFile.toFile().getName());
+	    OutputStream out = response.getOutputStream();
+	    FileInputStream fis = new FileInputStream(zipFile.toFile());
+		byte[] b = new byte[1024];
+		int length;
+		while((length = fis.read(b)) > 0) {
+			out.write(b, 0, length);
+		}
+		out.flush();
+		out.close();
+		fis.close();
+		
+		//return "/content/downloadpage";
+	}
+	
+	@RequestMapping(value = "/downloadExcel3", method = RequestMethod.GET)
+	@ResponseBody 
+	public void downloadExcel3(HttpServletResponse response) throws Exception {
 
-		// delete the zip file finally
-		// Files.deleteIfExists(zipfilePath);
+		Path zipFile = GenerateExcel();
 
-		return "/content/downloadpage";
+		response.setContentType("application/zip");
+	    response.setHeader("Content-disposition", "attachment; filename=" + zipFile.toFile().getName());
+	    
+	    OutputStream out = response.getOutputStream();
+	    out.write(Files.readAllBytes(zipFile));
+	    out.flush();
+	    out.close();
+	    response.flushBuffer();
+	    
+	    //return "/content/downloadpage";
 	}
 
 	private Path GenerateExcel() throws Exception {
+		
+		String fileName = "excel_" + sdf.format(new Date()) + ".xlsx";
+		
+		
 		SXSSFWorkbook wb = new SXSSFWorkbook(1); // keep 100 rows in memory, exceeding rows will be flushed to disk
 		Sheet sh = wb.createSheet();
 
@@ -70,9 +128,9 @@ public class DownloadFileController {
 
 				Cell cell = row.createCell(cellnum);
 
-				if (rownum == 0) 
+				if (rownum == 0)
 					SetCellStyleAndValue(wb, row, cell, header[cellnum]);
-				else 
+				else
 					cell.setCellValue(sdf.format(new Date()));
 
 			}
@@ -100,6 +158,7 @@ public class DownloadFileController {
 	}
 
 	private Path ZipSourceFile(Path file) throws Exception {
+		String zipName = "zip_" + sdf.format(new Date()) + ".zip";
 		Map<String, String> env = new HashMap<>();
 		// Create the zip file if it doesn't exist
 		env.put("create", "true");
